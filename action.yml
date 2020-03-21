@@ -1,0 +1,10 @@
+---
+name: "SonarCloud Scan with Gradle"
+description: "Scan your code with SonarCloud to detect bugs, vulnerabilities and code smells in Gradle"
+author: "jinguji"
+branding:
+  icon: 'check'
+  color: 'green'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
