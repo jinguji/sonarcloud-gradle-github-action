@@ -1,4 +1,4 @@
-FROM gradle:latest
+FROM gradle:jdk11
 
 RUN apt update \
   && apt install -y --no-install-recommends \
