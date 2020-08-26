@@ -2,9 +2,92 @@
 name: "SonarCloud Scan with Gradle"
 description: "Scan your code with SonarCloud to detect bugs, vulnerabilities and code smells in Gradle"
 author: "jinguji"
+inputs:
+  sonar-token:
+    description: >
+      **Required** this is the token used to authenticate access to SonarCloud.
+      You can generate a token on your [Security page in SonarCloud](https://sonarcloud.io/account/security/).
+      You can set the `SONAR_TOKEN` environment variable in the "Secrets" settings page of your repository.
+    required: true
+  sonar-host-url:
+    description: "SonarCloud endpoint. (default: `https://sonarcloud.io`)"
+    required: false
+    default: "https://sonarcloud.io"
+  sonar-organization:
+    description: "SonarCloud organization key. (default: <*repository owner*>)"
+    required: false
+    default: ${{ github.repository_owner }}
+  sonar-project-key:
+    description: >
+      The key generated when setting up the project on SonarCloud.
+      (default: <*repository owner*>_<*repository name*>)
+    required: false
+    # set default value in composite step
+  gradle-cli-opts:
+    description: "Gradle command line options. (default: blank)"
+    required: false
+  gradle-before-tasks:
+    description: "Task name to be executed before `sonarcube` task. (default: blank)"
+    required: false
+  gradle-after-tasks:
+    description: "Task name to be executed after `sonarcube` task. (default: blank)"
+    required: false
 branding:
-  icon: 'check'
-  color: 'green'
+  icon: "check"
+  color: "green"
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
+  using: "composite"
+  steps:
+    - name: Setup Sonar
+      id: setup-sonar
+      run: |
+        if [ -n "${{ inputs.sonar-project-key }}" ]; then
+          echo "::set-output name=sonar-project-key::${{ inputs.sonar-project-key }}"
+        else
+          echo "::set-output name=sonar-project-key::$(echo ${{ github.repository }} | tr "/" "_")"
+        fi
+      shell: bash
+    - name: Setup Gradle
+      id: setup-gradle
+      run: |
+        if [ -e ./gradlew ]; then
+          echo "::set-output name=gradle-path::./gradlew"
+        elif command -v gradle; then
+          echo "::set-output name=gradle-path::$(command -v gradle)"
+        else
+          echo "gradle(w) not found."
+          exit 1
+        fi
+      shell: bash
+    - name: Execute gradle
+      run: |
+        tasks=(${{ inputs.gradle-before-tasks }} sonarqube ${{ inputs.gradle-after-tasks }})
+        opts=(${{ inputs.gradle-cli-opts }})
+        case "${{ github.event_name }}" in
+          "push")
+            ${{ steps.setup-gradle.outputs.gradle-path }} \
+              "${tasks[@]}" \
+              "${opts[@]}" \
+              -Dsonar.host.url="${{ inputs.sonar-host-url }}" \
+              -Dsonar.organization="${{ inputs.sonar-organization }}" \
+              -Dsonar.projectKey="${{ steps.setup-sonar.outputs.sonar-project-key }}" \
+              -Dsonar.login="${{ inputs.sonar-token }}" \
+              -Dsonar.branch.name="${${{ github.ref }}##*/}"
+            ;;
+          "pull_request")
+            ${{ steps.setup-gradle.outputs.gradle-path }} \
+              "${tasks[@]}" \
+              "${opts[@]}" \
+              -Dsonar.host.url="${{ inputs.sonar-host-url }}" \
+              -Dsonar.organization="${{ inputs.sonar-organization }}" \
+              -Dsonar.projectKey="${{ steps.setup-sonar.outputs.sonar-project-key }}" \
+              -Dsonar.login="${{ inputs.sonar-token }}" \
+              -Dsonar.pullrequest.provider=GitHub \
+              -Dsonar.pullrequest.github.repository="${{ github.repository }}" \
+              -Dsonar.pullrequest.key="$(jq -r ".number" < "${{ github.event_path }}")"
+            ;;
+          *)
+            echo "Don't support event: ${{ github.event_name }}"
+            ;;
+        esac
+      shell: bash
