@@ -64,7 +64,7 @@ runs:
         tasks=(${{ inputs.gradle-before-tasks }} sonarqube ${{ inputs.gradle-after-tasks }})
         opts=(${{ inputs.gradle-cli-opts }})
         case "${{ github.event_name }}" in
-          "push")
+          "push" | "workflow_dispatch")
             ${{ steps.setup-gradle.outputs.gradle-path }} \
               "${tasks[@]}" \
               "${opts[@]}" \
