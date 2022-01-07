@@ -33,6 +33,7 @@ jobs:
 
 - `pull_request`
 - `push`
+- `workflow_dispatch`
 
 ### Environment variable
 
